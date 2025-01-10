@@ -63,9 +63,4 @@ export enum ExchangeType {
     TWAP_CANCEL = 'twapCancel'
 }
 
-export const WEBSOCKET = {
-    MAINNET_URL: 'wss://api.hyperliquid.xyz/ws',
-    TESTNET_URL: 'wss://api.hyperliquid-testnet.xyz/ws'
-};
-
 export const SDK_CODE = 'PLACEHOLDER';

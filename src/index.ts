@@ -1,7 +1,5 @@
 import { InfoAPI } from './rest/info';
 import { ExchangeAPI } from './rest/exchange';
-import { WebSocketClient } from './websocket/connection';
-import { WebSocketSubscriptions } from './websocket/subscriptions';
 import { RateLimiter } from './utils/rateLimiter';
 import * as CONSTANTS from './types/constants';
 import { CustomOperations } from './rest/custom';
@@ -9,13 +7,9 @@ import { ethers } from 'ethers';
 import { SymbolConversion } from './utils/symbolConversion';
 import { AuthenticationError } from './utils/errors';
 
-
-
 export class Hyperliquid {
   public info: InfoAPI;
   public exchange: ExchangeAPI;
-  public ws: WebSocketClient;
-  public subscriptions: WebSocketSubscriptions;
   public custom: CustomOperations;
   public symbolConversion: SymbolConversion;
 
@@ -27,10 +21,9 @@ export class Hyperliquid {
   private _privateKey?: string;
   private _walletAddress?: string;
   private vaultAddress?: string | null = null;
-  private enableWs: boolean // Disable for client side
 
-  constructor(params: {enableWs?: boolean, privateKey?: string, testnet?: boolean, walletAddress?: string, vaultAddress?: string} = {}) {
-    const { enableWs = true, privateKey, testnet = false, walletAddress, vaultAddress } = params;
+  constructor(params: {privateKey?: string, testnet?: boolean, walletAddress?: string, vaultAddress?: string} = {}) {
+    const { privateKey, testnet = false, walletAddress, vaultAddress } = params;
     const baseURL = testnet ? CONSTANTS.BASE_URLS.TESTNET : CONSTANTS.BASE_URLS.PRODUCTION;
 
     this.rateLimiter = new RateLimiter();
@@ -39,11 +32,7 @@ export class Hyperliquid {
     this.vaultAddress = vaultAddress || null;
     // Initialize info API
     this.info = new InfoAPI(baseURL, this.rateLimiter, this.symbolConversion, this);
-    
-    // Initialize WebSocket
-    this.enableWs = enableWs;
-    this.ws = new WebSocketClient(testnet);
-    this.subscriptions = new WebSocketSubscriptions(this.ws, this.symbolConversion);
+  
     
     // Create proxy objects for exchange and custom
     this.exchange = this.createAuthenticatedProxy(ExchangeAPI);
@@ -71,11 +60,6 @@ export class Hyperliquid {
     try {
       // Initialize symbol conversion first
       await this.symbolConversion.initialize();
-      
-      // Connect WebSocket
-      if (this.enableWs) {
-        await this.ws.connect();
-      }
       
       this._initialized = true;
       this._initializing = null;
@@ -130,42 +114,6 @@ export class Hyperliquid {
       }
     });
   }
-
-  private initializeWithPrivateKey(privateKey: string, testnet: boolean = false): void {
-    try {
-      const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}` as `0x${string}`;
-      new ethers.Wallet(formattedPrivateKey); // Validate the private key
-      
-      this.exchange = new ExchangeAPI(
-          testnet, 
-          formattedPrivateKey, 
-          this.info, 
-          this.rateLimiter, 
-          this.symbolConversion, 
-          this.walletAddress,
-          this,
-          this.vaultAddress
-      );
-      this.custom = new CustomOperations(this.exchange, this.info, formattedPrivateKey, this.symbolConversion, this.walletAddress);
-      this.isValidPrivateKey = true;
-    } catch (error) {
-      console.warn("Invalid private key provided. Some functionalities will be limited.");
-      this.isValidPrivateKey = false;
-    }
-  }
-
-  // Modify existing methods to check initialization
-  public isAuthenticated(): boolean {
-    this.ensureInitialized();
-    return this.isValidPrivateKey;
-}
-
-
-disconnect(): void {
-    this.ensureInitialized();
-    this.ws.close();
-}
-
 }
 
 export * from './types';
